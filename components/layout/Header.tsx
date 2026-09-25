@@ -40,12 +40,10 @@ export function Header({ title, subtitle }: { title: string; subtitle?: string }
 
   return (
     <>
-      {/* 
-        PERUBAHAN UTAMA: 
-        1. Di mobile (default): Tanpa sticky, tanpa border-b, tanpa backdrop-blur agar menyatu dengan konten.
-        2. Di desktop (lg:): Baru diaktifkan sticky, border-b, bg-white/80, dan padding desktop.
-      */}
-      <div className="border-b border-zinc-200 bg-white px-4 py-4 sm:px-6 lg:sticky lg:top-0 lg:z-10 lg:bg-white/80 lg:backdrop-blur lg:py-5">
+      <div
+        className="sticky top-0 z-10 border-b border-zinc-200 bg-white px-4 py-4 sm:px-6 lg:py-5"
+        style={{ transform: "translateZ(0)", willChange: "transform" }}
+      >
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-lg font-bold tracking-tight text-zinc-900 sm:text-xl truncate">{title}</h1>
