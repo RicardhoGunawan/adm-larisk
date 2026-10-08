@@ -1,184 +1,182 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Search, ChevronLeft, ChevronRight, Wallet, CheckCircle, Clock } from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import { Input } from "@/components/ui/Input";
+import { useEffect, useState } from "react";
+import { Search, ChevronLeft, ChevronRight, Wallet, CircleCheck, Hourglass } from "lucide-react";
+import { PageHeader } from "@/components/layout/Header";
+import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { formatDate, formatRupiah, getInvoiceBadge } from "@/lib/utils";
+import { Input } from "@/components/ui/Input";
+import { Badge } from "@/components/ui/Badge";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
+import { Empty } from "@/components/ui/Empty";
+import { Stat } from "@/components/Stat";
+import { useToast } from "@/components/ui/toast";
+import { formatRupiah, formatTanggal, statusTagihan } from "@/lib/utils";
 import type { Invoice } from "@/lib/types";
-import { apiFetch, getStoredToken } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
+
+type Filter = "all" | "unpaid" | "paid";
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: "all", label: "Semua" },
+  { value: "unpaid", label: "Belum bayar" },
+  { value: "paid", label: "Lunas" },
+];
 
 export default function BillingPage() {
-  const router = useRouter();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const { toast } = useToast();
+  const [list, setList] = useState<Invoice[]>([]);
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState<string>("all");
+  const [filter, setFilter] = useState<Filter>("all");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchInvoices = useCallback(async () => {
-    if (!getStoredToken()) {
-      router.replace("/login");
-      return;
-    }
+  async function load() {
     setLoading(true);
-    setError(null);
     try {
-      const params = new URLSearchParams();
-      params.set("page", String(page));
-      params.set("per_page", "20");
+      const params = new URLSearchParams({ page: String(page), per_page: "15" });
       if (q) params.set("q", q);
-      if (status !== "all") params.set("status", status);
-      const res = await apiFetch<{ data: Invoice[]; meta: { total: number; last_page: number } }>(`/admin/invoices?${params.toString()}`);
-      setInvoices(res.data);
-      setTotal(res.meta.total);
+      if (filter === "unpaid") params.set("status", "open");
+      else if (filter === "paid") params.set("status", "paid");
+      const [res, expiredRes] = await Promise.all([
+        apiFetch<{ data: Invoice[]; meta: { total: number; last_page: number } }>(
+          `/admin/invoices?${params}`
+        ),
+        // Tagihan kedaluwarsa disembunyikan — hitung agar total tetap jujur
+        filter === "all"
+          ? apiFetch<{ data: Invoice[]; meta: { total: number } }>(`/admin/invoices?status=expired&per_page=1`)
+          : Promise.resolve(null),
+      ]);
+      // Kedaluwarsa tidak perlu ditampilkan
+      setList(res.data.filter((i) => i.status !== "expired"));
+      setTotal(res.meta.total - (expiredRes?.meta.total ?? 0));
       setLastPage(res.meta.last_page);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setInvoices([]);
-      setTotal(0);
-      setLastPage(1);
+      toast(e instanceof Error ? e.message : String(e), "error");
     } finally {
       setLoading(false);
     }
-  }, [page, q, status, router]);
+  }
 
   useEffect(() => {
-    const t = setTimeout(fetchInvoices, q ? 400 : 0);
+    const t = setTimeout(load, q ? 400 : 0);
     return () => clearTimeout(t);
-  }, [fetchInvoices, q]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, q, filter]);
 
-  const totals = useMemo(() => {
-    const paid = invoices.filter((i) => i.status === "paid").reduce((a, b) => a + b.amount_idr, 0);
-    const pending = invoices.filter((i) => ["open", "pending"].includes(i.status)).reduce((a, b) => a + b.amount_idr, 0);
-    return { paid, pending, count: invoices.length };
-  }, [invoices]);
+  const lunas = list.filter((i) => i.status === "paid").reduce((a, b) => a + b.amount_idr, 0);
+  const belum = list.filter((i) => ["open", "pending", "draft"].includes(i.status)).reduce((a, b) => a + b.amount_idr, 0);
 
   return (
     <div className="min-w-0">
-      <Header title="Transaksi Tagihan" subtitle="Monitor invoice & pembayaran langganan" />
-      <div className="space-y-4 p-4 sm:p-6 max-w-[1600px] mx-auto">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600">Total Invoice</p>
-              <Wallet className="h-4 w-4 text-zinc-400" />
-            </div>
-            <p className="mt-2 text-2xl font-bold text-zinc-900">{loading ? "—" : totals.count}</p>
-            <p className="mt-1 text-xs text-zinc-600">Total DB: {total}</p>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Sudah Lunas</p>
-              <CheckCircle className="h-4 w-4 text-emerald-600" />
-            </div>
-            <p className="mt-2 text-2xl font-bold text-emerald-800">{loading ? "—" : formatRupiah(totals.paid)}</p>
-            <p className="mt-1 text-xs text-zinc-600">Hal ini</p>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Pending</p>
-              <Clock className="h-4 w-4 text-amber-600" />
-            </div>
-            <p className="mt-2 text-2xl font-bold text-amber-800">{loading ? "—" : formatRupiah(totals.pending)}</p>
-            <p className="mt-1 text-xs text-zinc-600">Open + Pending</p>
-          </Card>
+      <PageHeader title="Tagihan" desc="Siapa sudah bayar, siapa belum" />
+
+      <div className="mx-auto max-w-[1440px] space-y-5 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <Stat icon={Wallet} label="Total tagihan" value={String(total)} hint={`Halaman ${page}/${lastPage}`} />
+          <Stat icon={CircleCheck} label="Sudah dibayar" value={formatRupiah(lunas)} hint="Di halaman ini" tone="good" />
+          <div className="col-span-2 lg:col-span-1">
+            <Stat icon={Hourglass} label="Belum dibayar" value={formatRupiah(belum)} hint="Perlu ditagih" tone={belum > 0 ? "warn" : "good"} />
+          </div>
         </div>
 
         <Card>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div className="relative w-full sm:max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-                <Input placeholder="Cari ID invoice / bisnis..." value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} className="pl-9" />
-              </div>
-              <select
-                value={status}
-                onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-                className="h-9 rounded-xl border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-              >
-                <option value="all">Semua status</option>
-                <option value="open">Belum Bayar</option>
-                <option value="pending">Pending</option>
-                <option value="paid">Lunas</option>
-                <option value="expired">Expired</option>
-                <option value="failed">Gagal</option>
-              </select>
+          <CardContent className="space-y-3 p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Cari nomor tagihan atau nama toko..."
+                value={q}
+                onChange={(e) => { setQ(e.target.value); setPage(1); }}
+                className="pl-9"
+              />
             </div>
-            <p className="text-xs font-medium text-zinc-600 whitespace-nowrap">
-              {loading ? "Memuat..." : `${total} invoice`} • Hal {page}/{lastPage}
-            </p>
-          </div>
-          {error && (
-            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5">
-              <p className="text-xs font-semibold text-red-800">Gagal memuat invoice</p>
-              <p className="text-xs text-red-700 break-words mt-1">{error}</p>
+            <div className="flex flex-wrap gap-2">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => { setFilter(f.value); setPage(1); }}
+                  className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold ${
+                    filter === f.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
             </div>
-          )}
+          </CardContent>
         </Card>
 
-        <Card className="overflow-hidden p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-zinc-50 text-left">
-                <tr className="border-b border-zinc-200">
-                  <th className="px-4 py-3 text-xs font-semibold text-zinc-700">Invoice</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-zinc-700">Bisnis</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-zinc-700">Jumlah</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-zinc-700">Status</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-zinc-700">Jatuh Tempo</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-zinc-700">Dibuat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((inv) => {
-                  const badge = getInvoiceBadge(inv.status);
+        <Card>
+          {/* Kartu di HP */}
+          <div className="space-y-2 p-4 sm:hidden">
+            {loading && <p className="py-6 text-center text-sm text-muted-foreground">Memuat tagihan...</p>}
+            {!loading && list.length === 0 && <Empty icon={Wallet} title="Tidak ada tagihan" hint="Coba ubah saringan." />}
+            {list.map((inv) => {
+              const st = statusTagihan(inv.status);
+              return (
+                <div key={inv.id} className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-bold">{inv.business_name}</p>
+                      <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{inv.invoice_number}</p>
+                    </div>
+                    <Badge variant={st.variant}>{st.label}</Badge>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <p className="text-sm font-bold">{formatRupiah(inv.amount_idr)}</p>
+                    <p className="text-xs text-muted-foreground">Jatuh tempo {formatTanggal(inv.due_date)}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Tabel di desktop */}
+          <div className="hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-4">Tagihan</TableHead>
+                  <TableHead>Toko</TableHead>
+                  <TableHead>Jumlah</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="pr-4">Jatuh tempo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {list.map((inv) => {
+                  const st = statusTagihan(inv.status);
                   return (
-                    <tr key={inv.id} className="border-t border-zinc-100">
-                      <td className="px-4 py-3 font-mono text-xs font-semibold text-zinc-900 whitespace-nowrap">{inv.invoice_number}</td>
-                      <td className="px-4 py-3 text-xs font-medium text-zinc-700 max-w-[180px] truncate">{inv.business_name}</td>
-                      <td className="px-4 py-3 font-semibold text-zinc-900 whitespace-nowrap">{formatRupiah(inv.amount_idr)}</td>
-                      <td className="px-4 py-3">
-                        <Badge className={badge.className}>{badge.label}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-zinc-600 whitespace-nowrap">{formatDate(inv.due_date)}</td>
-                      <td className="px-4 py-3 text-xs text-zinc-600 whitespace-nowrap">{formatDate(inv.created_at)}</td>
-                    </tr>
+                    <TableRow key={inv.id}>
+                      <TableCell className="pl-4 font-mono text-xs font-semibold">{inv.invoice_number}</TableCell>
+                      <TableCell className="max-w-[200px] truncate font-medium">{inv.business_name}</TableCell>
+                      <TableCell className="font-bold whitespace-nowrap">{formatRupiah(inv.amount_idr)}</TableCell>
+                      <TableCell><Badge variant={st.variant}>{st.label}</Badge></TableCell>
+                      <TableCell className="pr-4 text-xs text-muted-foreground whitespace-nowrap">{formatTanggal(inv.due_date)}</TableCell>
+                    </TableRow>
                   );
                 })}
-                {invoices.length === 0 && !loading && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center">
-                      <p className="text-sm font-medium text-zinc-700">Tidak ada invoice ditemukan.</p>
-                      <p className="text-xs text-zinc-500 mt-1">Ubah filter atau buat tagihan baru via billing.</p>
-                    </td>
-                  </tr>
+                {list.length === 0 && !loading && (
+                  <TableRow><TableCell colSpan={5}><Empty icon={Wallet} title="Tidak ada tagihan" hint="Coba ubah saringan." /></TableCell></TableRow>
                 )}
                 {loading && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-sm text-zinc-600">
-                      Memuat data invoice...
-                    </td>
-                  </tr>
+                  <TableRow><TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">Memuat tagihan...</TableCell></TableRow>
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-zinc-200 px-4 py-3 bg-zinc-50">
-            <p className="text-xs font-medium text-zinc-700">Total {total} invoice • Hal {page}/{lastPage}</p>
+
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <p className="text-xs text-muted-foreground">Halaman {page} dari {lastPage} · {total} tagihan · tanpa yang kedaluwarsa</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                <ChevronLeft className="h-4 w-4 mr-1" /> Prev
+                <ChevronLeft /> Kembali
               </Button>
               <Button variant="outline" size="sm" disabled={page >= lastPage} onClick={() => setPage((p) => p + 1)}>
-                Next <ChevronRight className="h-4 w-4 ml-1" />
+                Lanjut <ChevronRight />
               </Button>
             </div>
           </div>

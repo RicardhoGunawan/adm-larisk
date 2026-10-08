@@ -19,6 +19,7 @@ export function useAuth() {
   useEffect(() => {
     const token = getStoredToken();
     if (!token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       return;
     }

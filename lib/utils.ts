@@ -1,30 +1,33 @@
-export function formatRupiah(value: number): string {
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+export function formatRupiah(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "Rp 0";
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
     currency: "IDR",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(Number(value));
 }
 
-export function formatDate(dateString?: string, opts?: Intl.DateTimeFormatOptions): string {
+export function formatTanggal(dateString?: string | null): string {
   if (!dateString) return "-";
   const d = new Date(dateString);
-  if (isNaN(d.getTime())) return dateString;
-  return d.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    ...opts,
-  });
+  if (Number.isNaN(d.getTime())) return String(dateString);
+  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
-export function formatDateTime(dateString?: string): string {
+export function formatTanggalWaktu(dateString?: string | null): string {
   if (!dateString) return "-";
   const d = new Date(dateString);
-  if (isNaN(d.getTime())) return dateString;
+  if (Number.isNaN(d.getTime())) return String(dateString);
   return d.toLocaleString("id-ID", {
-    day: "2-digit",
+    day: "numeric",
     month: "short",
     year: "numeric",
     hour: "2-digit",
@@ -32,40 +35,66 @@ export function formatDateTime(dateString?: string): string {
   });
 }
 
-export function cn(...classes: (string | boolean | undefined)[]): string {
-  return classes.filter(Boolean).join(" ");
-}
-
-export function getSubscriptionBadge(status: string): { label: string; className: string } {
+/** Status langganan -> bahasa pemilik toko yang mudah dimengerti */
+export function statusLangganan(status: string): { label: string; variant: "success" | "info" | "warning" | "danger" | "muted" } {
   switch (status) {
     case "active":
-      return { label: "Aktif", className: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+      return { label: "Aktif · Sudah bayar", variant: "success" };
     case "trialing":
-      return { label: "Trial", className: "bg-blue-100 text-blue-700 border-blue-200" };
+      return { label: "Masa coba", variant: "info" };
     case "past_due":
-      return { label: "Jatuh Tempo", className: "bg-amber-100 text-amber-700 border-amber-200" };
+      return { label: "Perlu bayar", variant: "warning" };
     case "expired":
-      return { label: "Expired", className: "bg-red-100 text-red-700 border-red-200" };
+      return { label: "Berakhir · Belum bayar", variant: "danger" };
     case "canceled":
-      return { label: "Dibatalkan", className: "bg-zinc-100 text-zinc-600 border-zinc-200" };
+      return { label: "Berhenti", variant: "muted" };
     default:
-      return { label: status, className: "bg-zinc-100 text-zinc-600 border-zinc-200" };
+      return { label: status || "-", variant: "muted" };
   }
 }
 
-export function getInvoiceBadge(status: string): { label: string; className: string } {
+/** Status tagihan -> bahasa sederhana */
+export function statusTagihan(status: string): { label: string; variant: "success" | "info" | "warning" | "danger" | "muted" } {
   switch (status) {
     case "paid":
-      return { label: "Lunas", className: "bg-emerald-100 text-emerald-700 border-emerald-200" };
+      return { label: "Lunas", variant: "success" };
     case "pending":
-      return { label: "Pending", className: "bg-amber-100 text-amber-700 border-amber-200" };
+      return { label: "Menunggu bayar", variant: "warning" };
     case "open":
-      return { label: "Belum Bayar", className: "bg-orange-100 text-orange-700 border-orange-200" };
+      return { label: "Belum dibayar", variant: "warning" };
     case "expired":
-      return { label: "Kedaluwarsa", className: "bg-red-100 text-red-700 border-red-200" };
+      return { label: "Kedaluwarsa", variant: "danger" };
     case "failed":
-      return { label: "Gagal", className: "bg-red-100 text-red-700 border-red-200" };
+      return { label: "Gagal", variant: "danger" };
+    case "draft":
+      return { label: "Draf", variant: "muted" };
     default:
-      return { label: status, className: "bg-zinc-100 text-zinc-600 border-zinc-200" };
+      return { label: status || "-", variant: "muted" };
   }
+}
+
+// Kompatibilitas dengan kode lama
+export const formatDate = formatTanggal;
+export const formatDateTime = formatTanggalWaktu;
+export function getSubscriptionBadge(status: string): { label: string; className: string } {
+  const s = statusLangganan(status);
+  const map = {
+    success: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    info: "bg-sky-100 text-sky-800 border-sky-200",
+    warning: "bg-amber-100 text-amber-800 border-amber-200",
+    danger: "bg-red-100 text-red-800 border-red-200",
+    muted: "bg-zinc-100 text-zinc-600 border-zinc-200",
+  } as const;
+  return { label: s.label, className: map[s.variant] };
+}
+export function getInvoiceBadge(status: string): { label: string; className: string } {
+  const s = statusTagihan(status);
+  const map = {
+    success: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    info: "bg-sky-100 text-sky-800 border-sky-200",
+    warning: "bg-amber-100 text-amber-800 border-amber-200",
+    danger: "bg-red-100 text-red-800 border-red-200",
+    muted: "bg-zinc-100 text-zinc-600 border-zinc-200",
+  } as const;
+  return { label: s.label, className: map[s.variant] };
 }

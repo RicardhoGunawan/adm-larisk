@@ -1,370 +1,418 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Users, Store, BadgeCheck, Wallet, ArrowRight, Receipt, TrendingUp, TrendingDown, Coins, Percent, ArrowUpRight } from "lucide-react";
-import { Header } from "@/components/layout/Header";
-import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
+import Link from "next/link";
+import {
+  Wallet,
+  PiggyBank,
+  Store,
+  ReceiptText,
+  ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight,
+  TriangleAlert,
+  Inbox,
+  type LucideIcon,
+} from "lucide-react";
+import { PageHeader } from "@/components/layout/Header";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { StatsCard } from "@/components/StatsCard";
-import { formatRupiah, formatDate } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Empty } from "@/components/ui/Empty";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
+import { formatRupiah, formatTanggal } from "@/lib/utils";
 import type { DashboardStats, Invoice } from "@/lib/types";
-import { apiFetch, getStoredToken } from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { useAdmin } from "@/lib/use-admin";
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+/* ---------- Grafik SVG mungil (tanpa library, tajam di layar besar) ---------- */
 
-  useEffect(() => {
-    if (!getStoredToken()) {
-      router.replace("/login");
-      return;
-    }
-    let cancelled = false;
-    async function load() {
-      try {
-        const [statsRes, invRes] = await Promise.all([
-          apiFetch<{ data: DashboardStats }>(`/admin/stats`),
-          apiFetch<{ data: Invoice[]; meta?: unknown }>(`/admin/invoices?per_page=8`),
-        ]);
-        if (!cancelled) {
-          setStats(statsRes.data);
-          setInvoices((invRes.data as Invoice[]) ?? []);
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
-  if (loading) {
-    return (
-      <div className="min-w-0">
-        <Header title="Dashboard Overview" subtitle="Memuat data..." />
-        <div className="mx-auto max-w-[1600px] p-4 sm:p-6 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i} className="p-5 animate-pulse">
-                <div className="h-3 w-24 bg-zinc-200 rounded" />
-                <div className="h-7 w-20 bg-zinc-200 rounded mt-4" />
-                <div className="h-3 w-32 bg-zinc-100 rounded mt-2" />
-              </Card>
-            ))}
-          </div>
-          <Card className="p-10 text-center text-sm text-zinc-600">Memuat dashboard...</Card>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-w-0">
-        <Header title="Dashboard Overview" subtitle="Gagal memuat data" />
-        <div className="mx-auto max-w-[1600px] p-4 sm:p-6">
-          <Card className="border-red-200 bg-red-50">
-            <p className="text-sm font-semibold text-red-800">Gagal memuat dashboard</p>
-            <p className="mt-1 text-sm text-red-700 break-words">{error}</p>
-            <p className="mt-3 text-xs text-red-600">Silakan coba muat ulang halaman atau login kembali.</p>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  if (!stats) return null;
-
-  const maxRev6m = Math.max(1, ...stats.revenue_6m.map((r) => r.revenue));
-  const maxHour = Math.max(1, ...stats.activity_hourly.map((h) => h.count));
-
+function Spark({ points, stroke = "#18181b" }: { points: number[]; stroke?: string }) {
+  const W = 132;
+  const H = 40;
+  if (points.length < 2) return <div style={{ width: W, height: H }} />;
+  const max = Math.max(...points, 1);
+  const min = Math.min(...points, 0);
+  const span = Math.max(1, max - min);
+  const step = W / (points.length - 1);
+  const d = points
+    .map((p, i) => `${i === 0 ? "M" : "L"}${(i * step).toFixed(1)},${(H - 4 - ((p - min) / span) * (H - 10)).toFixed(1)}`)
+    .join(" ");
   return (
-    <div className="min-w-0">
-      <Header title="Dashboard Overview" subtitle="Ringkasan performa platform LarisK" />
-
-      <div className="mx-auto max-w-[1600px] space-y-4 sm:space-y-6 p-4 sm:p-6">
-        {/* Stats */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 sm:gap-4">
-          <StatsCard icon={<Users className="h-4 w-4 text-zinc-600" />} label="Total User" value={stats.total_users.toLocaleString("id-ID")} sub={`${stats.new_users_7d} baru dalam 7 hari`} />
-          <StatsCard icon={<Store className="h-4 w-4 text-zinc-600" />} label="Total Bisnis / Toko" value={stats.total_businesses.toLocaleString("id-ID")} sub={`${stats.total_outlets} outlet terdaftar`} />
-          <StatsCard icon={<BadgeCheck className="h-4 w-4 text-zinc-600" />} label="Langganan Aktif" value={stats.active_subscriptions.toLocaleString("id-ID")} sub={`${stats.trialing_subscriptions} trial • ${stats.expired_subscriptions} expired`} />
-          <StatsCard icon={<Wallet className="h-4 w-4 text-zinc-600" />} label="Pendapatan Bulan Ini" value={formatRupiah(stats.revenue_month)} sub={`Total: ${formatRupiah(stats.revenue_total)} • ${stats.pending_invoices} pending`} />
-        </div>
-
-        {/* No.1 Revenue & Subscription Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Wallet className="h-4 w-4 text-zinc-500" /> Pendapatan</CardTitle>
-              <span className={`text-xs font-semibold px-2 py-1 rounded-full ${stats.growth_percent >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-                {stats.growth_percent >= 0 ? <><TrendingUp className="h-3 w-3 inline mr-1" />+{stats.growth_percent}%</> : <><TrendingDown className="h-3 w-3 inline mr-1" />{stats.growth_percent}%</>} vs bulan lalu
-              </span>
-            </CardHeader>
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="rounded-xl bg-zinc-900 text-white p-4">
-                <p className="text-xs text-zinc-300">Bulan Ini</p>
-                <p className="text-lg font-bold mt-1">{formatRupiah(stats.mrr)}</p>
-                <p className="text-xs text-zinc-400 mt-1">Pendapatan rutin</p>
-              </div>
-              <div className="rounded-xl bg-zinc-50 border p-4">
-                <p className="text-xs text-zinc-500">Perkiraan Setahun</p>
-                <p className="text-lg font-bold text-zinc-900 mt-1">{formatRupiah(stats.arr)}</p>
-                <p className="text-xs text-zinc-500 mt-1">Bulan ini × 12</p>
-              </div>
-              <div className="rounded-xl bg-zinc-50 border p-4">
-                <p className="text-xs text-zinc-500">Bulan lalu</p>
-                <p className="text-lg font-bold text-zinc-900 mt-1">{formatRupiah(stats.revenue_last_month || 0)}</p>
-                <p className="text-xs text-zinc-500 mt-1">Growth {stats.growth_percent}%</p>
-              </div>
-            </div>
-            {/* 6m bar */}
-            <div className="flex items-end gap-2 h-24 px-1">
-              {stats.revenue_6m.map((r) => (
-                <div key={r.month} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="w-full rounded-t-lg bg-zinc-900 hover:bg-zinc-800 transition-colors" style={{ height: `${(r.revenue / maxRev6m) * 80 + 8}px` }} title={`${r.month}: ${formatRupiah(r.revenue)}`} />
-                  <span className="text-xs font-medium text-zinc-500">{r.month_short}</span>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-zinc-500 text-center mt-2">Pendapatan 6 bulan terakhir</p>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Percent className="h-4 w-4 text-zinc-500" /> Subscription Health</CardTitle>
-            </CardHeader>
-            <div className="space-y-3">
-              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3">
-                <p className="text-xs font-medium text-emerald-800">Trial Conversion</p>
-                <p className="text-2xl font-bold text-emerald-800 mt-1">{stats.trial_conversion}%</p>
-                <div className="w-full bg-emerald-200 rounded-full h-1.5 mt-2">
-                  <div className="bg-emerald-600 h-1.5 rounded-full" style={{ width: `${Math.min(100, stats.trial_conversion)}%` }} />
-                </div>
-                <p className="text-xs text-emerald-700 mt-1">Active / (Active+Expired)</p>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-red-50 border border-red-200 p-3">
-                  <p className="text-xs text-red-700">Churn Rate</p>
-                  <p className="text-lg font-bold text-red-800">{stats.churn_rate}%</p>
-                </div>
-                <div className="rounded-xl bg-blue-50 border border-blue-200 p-3">
-                  <p className="text-xs text-blue-700">ARPU</p>
-                  <p className="text-sm font-bold text-blue-800">{formatRupiah(stats.arpu)}</p>
-                </div>
-              </div>
-              <div className="rounded-xl bg-zinc-900 text-white p-3 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-zinc-300 flex items-center gap-1"><Coins className="h-3 w-3" /> LTV Estimasi</p>
-                  <p className="text-lg font-bold mt-1">{formatRupiah(stats.ltv)}</p>
-                </div>
-                <ArrowUpRight className="h-5 w-5 text-zinc-400" />
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Tren Trial vs Berlangganan */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><BadgeCheck className="h-4 w-4 text-zinc-500" /> Tren Pendaftaran — Trial vs Berlangganan (6 Bulan)</CardTitle>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" /> Trial</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Berlangganan</span>
-            </div>
-          </CardHeader>
-          {(() => {
-            const max = Math.max(1, ...stats.subscription_trend.map((d) => Math.max(d.trial, d.active)));
-            return (
-              <div className="flex items-end gap-3 h-36 px-1">
-                {stats.subscription_trend.map((d) => (
-                  <div key={d.month} className="flex-1 flex flex-col items-center gap-1.5">
-                    <div className="flex gap-1 items-end w-full justify-center h-28">
-                      <div className="flex-1 max-w-8 rounded-t-lg bg-blue-500 hover:bg-blue-600 transition-colors" style={{ height: `${(d.trial / max) * 96 + 6}px` }} title={`${d.month_short} Trial: ${d.trial}`} />
-                      <div className="flex-1 max-w-8 rounded-t-lg bg-emerald-600 hover:bg-emerald-700 transition-colors" style={{ height: `${(d.active / max) * 96 + 6}px` }} title={`${d.month_short} Active: ${d.active}`} />
-                    </div>
-                    <span className="text-xs font-medium text-zinc-500">{d.month_short}</span>
-                    <span className="text-xs font-mono text-zinc-600">{d.trial}/{d.active}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-          <div className="flex justify-between text-xs text-zinc-500 mt-3 px-1">
-            <span>Tiap bar kiri Trial (biru), kanan Berlangganan (hijau) per bulan</span>
-            <span>Total trial {stats.trialing_subscriptions} • Active {stats.active_subscriptions}</span>
-          </div>
-        </Card>
-
-        {/* No.2 Top Toko */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Store className="h-4 w-4 text-zinc-500" /> Top Toko by Transaksi</CardTitle>
-            <a href="/stores" className="text-xs font-medium text-zinc-600 hover:text-zinc-900">Lihat semua →</a>
-          </CardHeader>
-          <div className="overflow-x-auto -mx-5 px-5">
-            <table className="w-full text-sm min-w-[600px]">
-              <thead>
-                <tr className="border-b text-left text-xs text-zinc-500">
-                  <th className="pb-2 font-medium">#</th>
-                  <th className="pb-2 font-medium">Toko</th>
-                  <th className="pb-2 font-medium">Transaksi</th>
-                  <th className="pb-2 font-medium">Penjualan</th>
-                  <th className="pb-2 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.top_stores.map((s, i) => (
-                  <tr key={s.id} className="border-b last:border-0">
-                    <td className="py-3 text-xs font-medium text-zinc-500">#{i + 1}</td>
-                    <td className="py-3">
-                      <p className="font-medium text-zinc-900">{s.name}</p>
-                      <p className="text-xs text-zinc-500">{s.business_type} • {s.outlets_count} outlet • {s.users_count} user</p>
-                    </td>
-                    <td className="py-3 font-semibold">{s.transactions_count}</td>
-                    <td className="py-3 font-medium">{formatRupiah(s.total_sales)}</td>
-                    <td className="py-3">
-                      <Badge className={s.subscription_status === "active" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : s.subscription_status === "trialing" ? "bg-blue-100 text-blue-800 border-blue-200" : "bg-red-100 text-red-800 border-red-200"}>{s.subscription_status}</Badge>
-                    </td>
-                  </tr>
-                ))}
-                {stats.top_stores.length === 0 && <tr><td colSpan={5} className="py-8 text-center text-sm text-zinc-500">Belum ada transaksi.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Aktivitas Hari Ini — Per Jam</CardTitle>
-            <span className="text-xs text-zinc-500">{new Date().toLocaleDateString("id-ID", { weekday: "long", day: "2-digit", month: "short" })}</span>
-          </CardHeader>
-          <div className="flex items-end gap-1 h-28 px-1">
-            {stats.activity_hourly.map((h) => (
-              <div key={h.hour} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full bg-zinc-900 rounded-t" style={{ height: `${(h.count / maxHour) * 80 + 4}px`, opacity: h.count ? 1 : 0.1 }} title={`${h.label}: ${h.count} transaksi`} />
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-between text-xs text-zinc-500 mt-1">
-            <span>00:00</span><span>12:00</span><span>23:00</span>
-          </div>
-          <p className="text-xs text-zinc-500 text-center mt-2">{stats.activity_hourly.reduce((a, b) => a + b.count, 0)} transaksi hari ini</p>
-        </Card>
-
-        <Card className="min-w-0">
-          <CardHeader className="flex-col sm:flex-row sm:items-center gap-3">
-            <CardTitle className="flex items-center gap-2"><Receipt className="h-4 w-4 text-zinc-500" /> Invoice Terbaru</CardTitle>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <span className="hidden sm:inline text-xs text-zinc-500">{invoices.length} invoice</span>
-              <a href="/billing" className="ml-auto sm:ml-0 inline-flex items-center gap-1 rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800">
-                Kelola tagihan <ArrowRight className="h-3.5 w-3.5" />
-              </a>
-            </div>
-          </CardHeader>
-
-          <div className="hidden sm:block overflow-x-auto -mx-5 px-5">
-            <div className="min-w-[640px]">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-zinc-200 text-left text-xs font-medium text-zinc-600">
-                    <th className="pb-3 pr-4">Invoice</th>
-                    <th className="pb-3 pr-4">Bisnis</th>
-                    <th className="pb-3 pr-4">Jumlah</th>
-                    <th className="pb-3 pr-4">Status</th>
-                    <th className="pb-3">Jatuh Tempo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((inv) => (
-                    <tr key={inv.id} className="border-b border-zinc-100 last:border-0">
-                      <td className="py-3 pr-4 font-mono text-xs font-semibold text-zinc-900 whitespace-nowrap">{inv.invoice_number}</td>
-                      <td className="py-3 pr-4 max-w-[200px] truncate text-zinc-700">{inv.business_name}</td>
-                      <td className="py-3 pr-4 font-semibold text-zinc-900 whitespace-nowrap">{formatRupiah(inv.amount_idr)}</td>
-                      <td className="py-3 pr-4">
-                        <Badge
-                          className={
-                            inv.status === "paid"
-                              ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                              : inv.status === "pending"
-                                ? "bg-amber-100 text-amber-800 border-amber-200"
-                                : inv.status === "open"
-                                  ? "bg-orange-100 text-orange-800 border-orange-200"
-                                  : "bg-red-100 text-red-800 border-red-200"
-                          }
-                        >
-                          {inv.status}
-                        </Badge>
-                      </td>
-                      <td className="py-3 text-xs text-zinc-600 whitespace-nowrap">{formatDate(inv.due_date)}</td>
-                    </tr>
-                  ))}
-                  {invoices.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="py-10 text-center text-sm text-zinc-600">
-                        Belum ada invoice.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:hidden">
-            {invoices.map((inv) => (
-              <div key={inv.id} className="rounded-xl border border-zinc-200 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-mono text-xs font-semibold text-zinc-900">{inv.invoice_number}</p>
-                    <p className="truncate text-sm font-medium text-zinc-900 mt-1">{inv.business_name}</p>
-                    <p className="text-xs text-zinc-600 mt-1">Jatuh tempo {formatDate(inv.due_date)}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-zinc-900">{formatRupiah(inv.amount_idr)}</p>
-                    <div className="mt-1 flex justify-end">
-                      <Badge
-                        className={
-                          inv.status === "paid"
-                            ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                            : inv.status === "pending"
-                              ? "bg-amber-100 text-amber-800 border-amber-200"
-                              : "bg-red-100 text-red-800 border-red-200"
-                        }
-                      >
-                        {inv.status}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {invoices.length === 0 && <p className="py-8 text-center text-sm text-zinc-600">Belum ada invoice.</p>}
-          </div>
-        </Card>
-      </div>
-    </div>
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="overflow-visible" aria-hidden>
+      <path d={d} fill="none" stroke={stroke} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
-function StatRow({ label, value, tone }: { label: string; value: number; tone: "emerald" | "blue" | "red" | "amber" }) {
-  const map = {
-    emerald: "bg-emerald-50 text-emerald-800 border border-emerald-200",
-    blue: "bg-blue-50 text-blue-800 border border-blue-200",
-    red: "bg-red-50 text-red-800 border border-red-200",
-    amber: "bg-amber-50 text-amber-800 border border-amber-200",
-  };
+function RevenueChart({ data }: { data: { label: string; value: number }[] }) {
+  const W = 760;
+  const H = 260;
+  const pad = { l: 52, r: 12, t: 16, b: 30 };
+  const max = Math.max(1, ...data.map((d) => d.value));
+  const nice = niceCeil(max);
+  const x = (i: number) => pad.l + (i * (W - pad.l - pad.r)) / Math.max(1, data.length - 1);
+  const y = (v: number) => H - pad.b - (v / nice) * (H - pad.t - pad.b);
+  const pts = data.map((d, i) => [x(i), y(d.value)] as const);
+
+  // Kurva halus (catmull-rom -> bezier)
+  let line = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    line += ` C${c1x},${c1y} ${c2x},${c2y} ${p2[0]},${p2[1]}`;
+  }
+  const area = `${line} L${x(data.length - 1)},${H - pad.b} L${x(0)},${H - pad.b} Z`;
+  const gid = "revFill";
+
   return (
-    <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${map[tone]}`}>
-      <span className="text-sm font-medium truncate pr-3">{label}</span>
-      <span className="text-sm font-bold shrink-0">{value}</span>
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Grafik uang masuk 6 bulan">
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#18181b" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="#18181b" stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      {[0, 0.33, 0.66, 1].map((f) => {
+        const v = nice * f;
+        const yy = y(v);
+        return (
+          <g key={f}>
+            <line x1={pad.l} x2={W - pad.r} y1={yy} y2={yy} stroke="#e4e4e7" strokeDasharray={f === 0 ? "" : "4 4"} />
+            <text x={pad.l - 8} y={yy + 4} textAnchor="end" fontSize={11} fill="#a1a1aa" fontWeight={600}>
+              {shortRp(v)}
+            </text>
+          </g>
+        );
+      })}
+      <path d={area} fill={`url(#${gid})`} />
+      <path d={line} fill="none" stroke="#18181b" strokeWidth={2.5} strokeLinecap="round" />
+      {pts.map(([cx, cy], i) => (
+        <g key={i}>
+          <circle cx={cx} cy={cy} r={10} fill="transparent">
+            <title>{`${data[i].label}: ${formatRupiah(data[i].value)}`}</title>
+          </circle>
+          <circle cx={cx} cy={cy} r={4} fill="#18181b" stroke="#fff" strokeWidth={2} />
+        </g>
+      ))}
+      {data.map((d, i) => (
+        <text key={i} x={x(i)} y={H - 10} textAnchor="middle" fontSize={12} fill="#71717a" fontWeight={600}>
+          {d.label}
+        </text>
+      ))}
+    </svg>
+  );
+}
+
+function niceCeil(v: number): number {
+  if (v <= 0) return 1;
+  const pow = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / pow;
+  const nice = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10;
+  return nice * pow;
+}
+
+function shortRp(n: number): string {
+  if (n >= 1_000_000_000) return `Rp${(n / 1_000_000_000).toLocaleString("id-ID", { maximumFractionDigits: 1 })}M`;
+  if (n >= 1_000_000) return `Rp${(n / 1_000_000).toLocaleString("id-ID", { maximumFractionDigits: 1 })}jt`;
+  if (n >= 1_000) return `Rp${Math.round(n / 1_000)}rb`;
+  return `Rp${Math.round(n)}`;
+}
+
+/* ---------- Kartu KPI desktop ---------- */
+
+function Kpi({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  delta,
+  spark,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  sub: string;
+  delta?: { text: string; up: boolean };
+  spark?: number[];
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-zinc-900 text-white">
+              <Icon className="h-5 w-5" />
+            </span>
+            <p className="text-[13px] font-semibold text-zinc-500">{label}</p>
+          </div>
+          {delta && (
+            <Badge variant={delta.up ? "success" : "warning"}>
+              {delta.up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+              {delta.text}
+            </Badge>
+          )}
+        </div>
+        <p className="mt-4 text-[28px] font-bold leading-none tracking-tight tabular-nums">{value}</p>
+        <div className="mt-3 flex items-end justify-between gap-2">
+          <p className="text-xs leading-relaxed text-zinc-500">{sub}</p>
+          {spark && spark.length > 1 && (
+            <div className="hidden shrink-0 sm:block">
+              <Spark points={spark} stroke={delta && !delta.up ? "#b45309" : "#18181b"} />
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ---------- Halaman ---------- */
+
+export default function DashboardPage() {
+  const stats = useAdmin<{ data: DashboardStats }>(`/admin/stats`);
+  const invoices = useAdmin<{ data: Invoice[] }>(`/admin/invoices?per_page=8`);
+
+  const s = stats.data?.data;
+  const invList: Invoice[] = (invoices.data?.data as unknown as Invoice[]) ?? [];
+  const loading = stats.loading || invoices.loading;
+
+  const growth = s?.growth_percent ?? 0;
+  const naik = growth >= 0;
+  const needAttention = (s?.expired_subscriptions ?? 0) + (s?.pending_invoices ?? 0);
+  const topStores = (s?.top_stores ?? []).slice(0, 5);
+  const maxSales = Math.max(1, ...topStores.map((t) => t.total_sales));
+  const total6m = (s?.revenue_6m ?? []).reduce((a, b) => a + b.revenue, 0);
+
+  return (
+    <div className="min-w-0">
+      <PageHeader
+        title="Ringkasan Bisnis"
+        desc="Pantau uang masuk, toko, dan tagihan dalam satu layar"
+      />
+
+      <div className="mx-auto max-w-[1440px] space-y-5 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+        {loading && (
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Card key={i}>
+                  <CardContent className="space-y-3 p-5">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-8 w-40" />
+                    <Skeleton className="h-4 w-48" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Card>
+              <CardContent className="p-8 text-center text-sm text-zinc-500">Memuat data bisnis...</CardContent>
+            </Card>
+          </>
+        )}
+
+        {!loading && stats.error && (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-5">
+              <p className="text-sm font-bold text-red-800">Tidak bisa memuat data</p>
+              <p className="mt-1 text-sm text-red-700 break-words">{stats.error}</p>
+              <Button variant="outline" size="sm" className="mt-3 bg-white" onClick={() => { stats.reload(); invoices.reload(); }}>
+                Coba lagi
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {s && (
+          <>
+            {needAttention > 0 && (
+              <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center lg:px-5">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-amber-500 text-white">
+                  <TriangleAlert className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-amber-900">Ada {needAttention} hal perlu perhatian Anda</p>
+                  <p className="mt-0.5 text-[13px] text-amber-800">
+                    {[
+                      s.pending_invoices > 0 ? `${s.pending_invoices} tagihan belum dibayar` : "",
+                      s.expired_subscriptions > 0 ? `${s.expired_subscriptions} langganan toko bermasalah` : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+                <Link href="/billing" className="shrink-0">
+                  <Button size="sm" variant="outline" className="border-amber-300 bg-white text-amber-900 hover:bg-amber-100">
+                    Lihat & urus <ArrowRight />
+                  </Button>
+                </Link>
+              </div>
+            )}
+
+            {/* KPI */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <Kpi
+                icon={Wallet}
+                label="Uang masuk bulan ini"
+                value={formatRupiah(s.revenue_month)}
+                sub={`Bulan lalu ${formatRupiah(s.revenue_last_month || 0)}`}
+                delta={{ text: `${naik ? "+" : ""}${growth}%`, up: naik }}
+                spark={(s.revenue_6m ?? []).map((r) => r.revenue)}
+              />
+              <Kpi
+                icon={PiggyBank}
+                label="Total uang masuk"
+                value={formatRupiah(s.revenue_total)}
+                sub="Akumulasi sejak awal sampai sekarang"
+              />
+              <Kpi
+                icon={Store}
+                label="Toko aktif & masa coba"
+                value={`${(s.active_subscriptions + s.trialing_subscriptions).toLocaleString("id-ID")} toko`}
+                sub={`${s.total_businesses.toLocaleString("id-ID")} total toko · ${s.total_outlets.toLocaleString("id-ID")} cabang`}
+                spark={(s.subscription_trend ?? []).map((t) => t.active)}
+              />
+              <Kpi
+                icon={ReceiptText}
+                label="Tagihan belum dibayar"
+                value={`${s.pending_invoices.toLocaleString("id-ID")} tagihan`}
+                sub={s.pending_invoices > 0 ? "Segera follow-up agar tidak kedaluwarsa" : "Semua tagihan sudah beres. Bagus!"}
+                delta={s.pending_invoices > 0 ? { text: "Perlu tindakan", up: false } : undefined}
+              />
+            </div>
+
+            {/* Grafik arus uang — selebar layar */}
+            <Card>
+              <CardHeader className="flex-row items-start justify-between gap-3 space-y-0 p-5 pb-2 lg:p-6 lg:pb-2">
+                <div>
+                  <CardTitle className="text-base">Arus uang masuk · 6 bulan terakhir</CardTitle>
+                  <CardDescription>Dari tagihan langganan yang sudah dibayar toko</CardDescription>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Total 6 bulan</p>
+                  <p className="text-lg font-bold tabular-nums">{formatRupiah(total6m)}</p>
+                </div>
+              </CardHeader>
+              <CardContent className="p-5 pt-2 lg:p-6 lg:pt-2">
+                <RevenueChart data={(s.revenue_6m ?? []).map((r) => ({ label: r.month_short, value: r.revenue }))} />
+              </CardContent>
+            </Card>
+
+            {/* Tabel tagihan + toko ramai */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+              <Card className="xl:col-span-3">
+                <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 p-5 pb-3 lg:p-6 lg:pb-3">
+                  <div>
+                    <CardTitle className="text-base">Tagihan terbaru</CardTitle>
+                    <CardDescription>Nomor, toko, jumlah & status pembayaran</CardDescription>
+                  </div>
+                  <Link href="/billing">
+                    <Button variant="outline" size="sm">
+                      Semua tagihan <ArrowRight />
+                    </Button>
+                  </Link>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-zinc-50/80">
+                          <TableHead className="pl-5">No. Tagihan</TableHead>
+                          <TableHead>Toko</TableHead>
+                          <TableHead className="text-right">Jumlah</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="pr-5">Jatuh tempo</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {invList.slice(0, 6).map((inv) => (
+                          <TableRow key={inv.id}>
+                            <TableCell className="pl-5 font-mono text-xs font-semibold">{inv.invoice_number}</TableCell>
+                            <TableCell className="max-w-[220px] truncate font-medium">{inv.business_name}</TableCell>
+                            <TableCell className="text-right font-bold tabular-nums">{formatRupiah(inv.amount_idr)}</TableCell>
+                            <TableCell>
+                              <Badge variant={inv.status === "paid" ? "success" : inv.status === "expired" || inv.status === "failed" ? "danger" : "warning"}>
+                                {inv.status === "paid" ? "Lunas" : inv.status === "expired" ? "Kedaluwarsa" : "Belum bayar"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="pr-5 text-[13px] text-zinc-500">{formatTanggal(inv.due_date)}</TableCell>
+                          </TableRow>
+                        ))}
+                        {invList.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5}>
+                              <Empty icon={Inbox} title="Belum ada tagihan" hint="Tagihan baru akan tercatat di sini." />
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="space-y-2 p-4 md:hidden">
+                    {invList.slice(0, 6).map((inv) => (
+                      <div key={inv.id} className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-bold">{inv.business_name}</p>
+                          <p className="mt-0.5 font-mono text-[11px] text-zinc-500">{inv.invoice_number}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-[13px] font-bold tabular-nums">{formatRupiah(inv.amount_idr)}</p>
+                          <Badge variant={inv.status === "paid" ? "success" : "warning"} className="mt-1">
+                            {inv.status === "paid" ? "Lunas" : "Belum bayar"}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="xl:col-span-2">
+                <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 p-5 pb-3 lg:p-6 lg:pb-3">
+                  <div>
+                    <CardTitle className="text-base">Toko paling ramai</CardTitle>
+                    <CardDescription>Transaksi terbanyak bulan ini</CardDescription>
+                  </div>
+                  <Link href="/stores" className="inline-flex shrink-0 items-center gap-1 text-[13px] font-bold text-zinc-600 hover:text-zinc-950">
+                    Semua <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </CardHeader>
+                <CardContent className="space-y-4 p-5 pt-1 lg:p-6 lg:pt-1">
+                  {topStores.length === 0 && (
+                    <Empty icon={Store} title="Belum ada data" hint="Data muncul setelah toko mulai berjualan." />
+                  )}
+                  {topStores.map((t, i) => (
+                    <div key={t.id}>
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-[13px] font-bold tabular-nums">
+                          {i + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <p className="truncate text-[13px] font-bold">{t.name}</p>
+                            <p className="shrink-0 text-[13px] font-bold tabular-nums">{formatRupiah(t.total_sales)}</p>
+                          </div>
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+                            <div className="h-full rounded-full bg-zinc-900" style={{ width: `${Math.max(4, (t.total_sales / maxSales) * 100)}%` }} />
+                          </div>
+                          <p className="mt-1 text-xs text-zinc-500 tabular-nums">
+                            {t.transactions_count.toLocaleString("id-ID")} transaksi · {t.outlets_count} cabang
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

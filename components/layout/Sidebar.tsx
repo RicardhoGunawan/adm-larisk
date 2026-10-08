@@ -2,212 +2,248 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState, useRef, useEffect } from "react";
-import { LayoutDashboard, Users, Store, Receipt, Bell, LogOut, Menu, X, User, ChevronDown, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { PanelLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/components/ui/Toast";
-import { ConfirmModal } from "@/components/ui/Modal";
-import { Tooltip } from "@/components/ui/Tooltip";
+import { NAV } from "@/lib/nav";
+import { useMe } from "@/lib/use-admin";
+import { ConfirmDialog } from "@/components/ui/Dialog";
+import { useToast } from "@/components/ui/toast";
 import { apiFetch, getStoredToken } from "@/lib/api";
+import { hydrateSidebarState, useSidebarCollapsed } from "@/lib/sidebar";
 
-const nav = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/users", label: "Kelola User", icon: Users },
-  { href: "/stores", label: "Daftar Toko", icon: Store },
-  { href: "/billing", label: "Tagihan", icon: Receipt },
-  { href: "/notifications", label: "Notifikasi", icon: Bell },
-];
+function useLogout() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [confirm, setConfirm] = useState(false);
+  const doLogout = () => {
+    localStorage.removeItem("larisk_admin_token");
+    toast("Berhasil keluar", "success");
+    setTimeout(() => router.push("/login"), 300);
+  };
+  return { confirm, setConfirm, doLogout };
+}
 
-export function Sidebar() {
-  const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
-
+/** Angka kecil di menu: tagihan belum bayar & toko bermasalah */
+function useMenuBadges() {
+  const [badges, setBadges] = useState<{ billing: number; stores: number }>({ billing: 0, stores: 0 });
   useEffect(() => {
-    const v = localStorage.getItem("larisk_sidebar_collapsed");
-    if (v === "1") setCollapsed(true);
+    if (!getStoredToken()) return;
+    apiFetch<{ data: { pending_invoices: number; expired_subscriptions: number } }>(`/admin/stats`)
+      .then((r) => setBadges({ billing: r.data.pending_invoices ?? 0, stores: r.data.expired_subscriptions ?? 0 }))
+      .catch(() => {});
   }, []);
+  return badges;
+}
 
-  const toggle = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    localStorage.setItem("larisk_sidebar_collapsed", next ? "1" : "0");
+const MAIN = NAV.slice(0, 4);
+const MORE = NAV.slice(4);
+
+/**
+ * Isi sidebar yang SAMA untuk laptop & HP (1 desain):
+ * seksi menu + badge angka. Di laptop bisa diciutkan, di HP tampil penuh.
+ */
+function SidebarNav({
+  collapsed,
+  onNavigate,
+}: {
+  collapsed: boolean;
+  onNavigate?: () => void;
+}) {
+  const pathname = usePathname();
+  const badges = useMenuBadges();
+
+  const badgeFor = (href: string) => {
+    if (href === "/billing" && badges.billing > 0) return badges.billing;
+    if (href === "/stores" && badges.stores > 0) return badges.stores;
+    return 0;
+  };
+
+  const link = (item: (typeof NAV)[number]) => {
+    const active = pathname === item.href || pathname.startsWith(item.href + "/");
+    const Icon = item.icon;
+    const n = badgeFor(item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={onNavigate}
+        title={collapsed ? item.label : undefined}
+        className={cn(
+          "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+          collapsed && "justify-center px-0",
+          active
+            ? "bg-primary font-semibold text-primary-foreground shadow-sm"
+            : "font-medium text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900"
+        )}
+      >
+        <Icon className="h-[18px] w-[18px] shrink-0" />
+        {!collapsed && (
+          <span className="min-w-0 flex-1 whitespace-nowrap">
+            <span className="block leading-tight">{item.label}</span>
+            <span className={cn("mt-0.5 block truncate text-[11px] font-normal leading-tight", active ? "text-primary-foreground/70" : "text-zinc-400")}>
+              {item.desc}
+            </span>
+          </span>
+        )}
+        {!collapsed && n > 0 && (
+          <span
+            className={cn(
+              "flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums",
+              active ? "bg-white/25 text-white" : "bg-red-100 text-red-700"
+            )}
+          >
+            {n > 99 ? "99+" : n}
+          </span>
+        )}
+      </Link>
+    );
   };
 
   return (
-    <>
-      <aside className={cn("hidden shrink-0 flex-col border-r border-zinc-200 bg-white lg:flex h-screen sticky top-0 self-start transition-all duration-300", collapsed ? "w-[72px]" : "w-[260px]")}>
-        <div className={cn("flex h-16 items-center border-b border-zinc-200", collapsed ? "justify-center px-2" : "gap-3 px-6")}>
-          <Image src="/larisk-logo.png" alt="LarisK" width={44} height={44} className="h-11 w-11 shrink-0 rounded-xl bg-white object-contain p-1 border border-zinc-200" />
-          {!collapsed && (
-            <div className="min-w-0">
-              <p className="text-sm font-bold leading-none text-zinc-900">LarisK</p>
-            </div>
-          )}
-        </div>
-
-      <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
-        {nav.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
-          const Icon = item.icon;
-          const content = (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center rounded-xl text-sm font-semibold transition-colors",
-                collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
-                active ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-              )}
-            >
-              <span className={cn("flex h-7 w-7 items-center justify-center rounded-lg shrink-0", active ? "bg-white/20 text-white" : "bg-zinc-100 text-zinc-600")}>
-                <Icon className="h-4 w-4" />
-              </span>
-              {!collapsed && <span className="truncate">{item.label}</span>}
-            </Link>
-          );
-          return collapsed ? (
-            <Tooltip key={item.href} content={item.label}>
-              {content}
-            </Tooltip>
-          ) : (
-            content
-          );
-        })}
-      </nav>
-
-      </aside>
-
-      {/* Tombol bulat di luar sidebar — fixed biar tidak kepotong overflow */}
-      <button
-        onClick={toggle}
-        className="hidden lg:flex fixed top-8 z-20 h-7 w-7 items-center justify-center rounded-full bg-white border border-zinc-200 text-zinc-600 shadow-md hover:bg-zinc-50 hover:text-zinc-900 transition-all"
-        style={{ left: collapsed ? 58 : 246 }}
-        title={collapsed ? "Expand" : "Collapse"}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {collapsed ? <ChevronsRight className="h-3.5 w-3.5" /> : <ChevronsLeft className="h-3.5 w-3.5" />}
-      </button>
-    </>
+    <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-3 py-4">
+      <div>
+        {!collapsed && (
+          <p className="whitespace-nowrap px-3 pb-2 text-[11px] font-bold uppercase tracking-widest text-zinc-400">
+            Menu utama
+          </p>
+        )}
+        <div className="space-y-1">{MAIN.map(link)}</div>
+      </div>
+      <div>
+        {!collapsed && (
+          <p className="whitespace-nowrap px-3 pb-2 text-[11px] font-bold uppercase tracking-widest text-zinc-400">
+            Lainnya
+          </p>
+        )}
+        <div className="space-y-1">{MORE.map(link)}</div>
+      </div>
+    </nav>
   );
 }
 
+function Brand({ collapsed }: { collapsed: boolean }) {
+  return (
+    <Link
+      href="/dashboard"
+      className={cn(
+        "flex h-16 shrink-0 items-center gap-3 border-b border-zinc-200 px-5",
+        collapsed && "justify-center px-0"
+      )}
+    >
+      <Image
+        src="/larisk-logo.png"
+        alt="LarisK"
+        width={38}
+        height={38}
+        className="h-[38px] w-[38px] shrink-0 rounded-[10px] border border-zinc-200 bg-white object-contain"
+      />
+      {!collapsed && (
+        <div className="min-w-0 whitespace-nowrap">
+          <p className="text-[15px] font-bold leading-none tracking-tight">LarisK</p>
+          <p className="mt-1 text-[11px] font-medium leading-none text-zinc-500">Panel Pemilik Bisnis</p>
+        </div>
+      )}
+    </Link>
+  );
+}
+
+/** Sidebar laptop: dikunci (fixed), bisa diciutkan jadi ikon saja. */
+export function Sidebar() {
+  const collapsed = useSidebarCollapsed();
+
+  useEffect(() => {
+    hydrateSidebarState();
+  }, []);
+
+  return (
+    <aside
+      className={cn(
+        "fixed bottom-0 left-0 top-0 hidden flex-col overflow-hidden border-r border-zinc-200 bg-white transition-[width] duration-200 ease-in-out lg:flex",
+        collapsed ? "w-[76px]" : "w-[272px]"
+      )}
+    >
+      <Brand collapsed={collapsed} />
+      <SidebarNav collapsed={collapsed} />
+    </aside>
+  );
+}
+
+/**
+ * HP: bar atas + sidebar drawer geser dari kiri — isi SAMA dengan laptop.
+ * Tidak ada lagi navbar bawah yang berbeda desain.
+ */
 export function MobileNav() {
-  const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [avatarOpen, setAvatarOpen] = useState(false);
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
-  const { toast } = useToast();
-  const [confirmLogout, setConfirmLogout] = useState(false);
-  const avatarRef = useRef<HTMLDivElement>(null);
+  const me = useMe();
+  const { confirm, setConfirm, doLogout } = useLogout();
+  const initial = me?.name?.charAt(0)?.toUpperCase() || "A";
 
   useEffect(() => {
-    if (!getStoredToken()) return;
-    apiFetch<{ data: { user: { name: string; email: string } } }>(`/admin/auth/me`)
-      .then((res) => setUser(res.data.user))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) setAvatarOpen(false);
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const doLogout = () => {
-    localStorage.removeItem("larisk_admin_token");
-    toast("Berhasil logout", "success");
-    setTimeout(() => (window.location.href = "/login"), 400);
-  };
-
-  const initial = user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "A";
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [open ]);
 
   return (
     <>
-      <div className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4 lg:hidden">
+      <div className="sticky top-0 z-20 flex h-14 items-center gap-2.5 border-b border-zinc-200 bg-white px-4 lg:hidden">
         <button
-          onClick={() => setOpen((v) => !v)}
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
-          aria-label="Toggle menu"
+          onClick={() => setOpen(true)}
+          aria-label="Buka menu"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
         >
-          {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          <PanelLeft className="h-5 w-5" />
         </button>
-
-        <div className="relative" ref={avatarRef}>
-          <button onClick={() => setAvatarOpen((v) => !v)} className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white pl-1 pr-2 py-1 hover:bg-zinc-50">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">{initial}</span>
-            <ChevronDown className={`h-3 w-3 text-zinc-500 transition ${avatarOpen ? "rotate-180" : ""}`} />
-          </button>
-          {avatarOpen && (
-            <div className="absolute right-0 mt-2 w-60 rounded-2xl border border-zinc-200 bg-white shadow-xl overflow-hidden">
-              <div className="p-3 border-b border-zinc-100">
-                <p className="text-sm font-bold text-zinc-900 truncate flex items-center gap-2">
-                  <User className="h-4 w-4 text-zinc-500" />
-                  {user?.name || "Admin"}
-                </p>
-                <p className="text-xs text-zinc-500 truncate">{user?.email || "admin@larisk.id"}</p>
-              </div>
-              <div className="p-2">
-                <button onClick={() => { setAvatarOpen(false); setConfirmLogout(true); }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50">
-                  <LogOut className="h-4 w-4" /> Keluar
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <div className="min-w-0 flex-1" />
+        <button
+          onClick={() => setConfirm(true)}
+          aria-label="Keluar"
+          title={me?.name || "Keluar"}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-sm font-bold text-white"
+        >
+          {initial}
+        </button>
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-30 flex lg:hidden">
-          <div className="w-[300px] bg-white border-r border-zinc-200 flex flex-col shadow-2xl">
-            <div className="flex h-16 items-center gap-3 border-b border-zinc-200 px-5 bg-zinc-50/50">
-              <Image src="/larisk-logo.png" alt="LarisK" width={44} height={44} className="h-11 w-11 rounded-xl bg-white object-contain p-1 border border-zinc-200 shadow-sm shrink-0" />
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="overlay-enter absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
+          <aside className="drawer-enter absolute bottom-0 left-0 top-0 flex w-[280px] max-w-[85vw] flex-col overflow-hidden bg-white shadow-xl">
+            <div className="flex h-14 shrink-0 items-center gap-3 border-b border-zinc-200 px-4">
+              <Image src="/larisk-logo.png" alt="LarisK" width={30} height={30} className="h-8 w-8 rounded-lg border border-zinc-200 bg-white object-contain" />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold leading-none text-zinc-900">LarisK </p>
+                <p className="text-sm font-bold leading-none">LarisK</p>
+                <p className="mt-0.5 text-[11px] leading-none text-zinc-500">Panel Pemilik Bisnis</p>
               </div>
-              <button onClick={() => setOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-xl bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50">
-                <X className="h-4 w-4" />
+              <button
+                onClick={() => setOpen(false)}
+                aria-label="Tutup menu"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100"
+              >
+                <X className="h-5 w-5" />
               </button>
             </div>
-            <nav className="flex-1 space-y-1.5 p-4 overflow-y-auto">
-              {nav.map((item) => {
-                const active = pathname === item.href || pathname.startsWith(item.href + "/");
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all",
-                      active ? "bg-zinc-900 text-white shadow-md" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 border border-transparent hover:border-zinc-200"
-                    )}
-                  >
-                    <span className={cn("flex h-9 w-9 items-center justify-center rounded-xl shrink-0 transition-colors", active ? "bg-white/20 text-white" : "bg-white border border-zinc-200 text-zinc-600 shadow-sm")}>
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-            <div className="p-4 border-t border-zinc-200 bg-zinc-50/50">
-              <p className="text-xs text-zinc-500 text-center">© 2026 LarisK</p>
-            </div>
-          </div>
-          <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
+            <SidebarNav collapsed={false} onNavigate={() => setOpen(false)} />
+          </aside>
         </div>
       )}
 
-      <ConfirmModal
-        open={confirmLogout}
-        onClose={() => setConfirmLogout(false)}
+      <ConfirmDialog
+        open={confirm}
+        onClose={() => setConfirm(false)}
         onConfirm={doLogout}
-        title="Keluar dari dashboard?"
-        description="Sesi akan diakhiri dan kamu perlu login kembali."
-        confirmLabel="Logout"
+        title="Keluar dari panel?"
+        description="Anda harus masuk lagi untuk mengelola toko."
+        confirmLabel="Keluar"
         variant="danger"
       />
     </>

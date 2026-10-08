@@ -1,13 +1,9 @@
-import { Sidebar, MobileNav } from "@/components/layout/Sidebar";
+import { DashboardShell } from "@/components/layout/Shell";
 
+/**
+ * Di laptop: sidebar & topbar dikunci (fixed), hanya <main> yang scroll.
+ * Offset: sidebar 272px (atau 76px saat diciutkan), topbar h-16.
+ */
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex h-screen overflow-hidden bg-zinc-50">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <MobileNav />
-        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-zinc-50 overscroll-contain [scrollbar-gutter:stable]">{children}</main>
-      </div>
-    </div>
-  );
+  return <DashboardShell>{children}</DashboardShell>;
 }
