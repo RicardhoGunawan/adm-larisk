@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Dialog, ConfirmDialog } from "@/components/ui/Dialog";
 import { Empty } from "@/components/ui/Empty";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/Toast";
 import { formatTanggal, statusLangganan } from "@/lib/utils";
 import {
   Combobox,
