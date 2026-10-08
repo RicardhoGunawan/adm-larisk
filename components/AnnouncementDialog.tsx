@@ -14,7 +14,7 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@/components/ui/combobox";
-import { useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/Toast";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 

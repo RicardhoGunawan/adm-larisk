@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { apiFetch, setStoredToken } from "@/lib/api";
-import { toast } from "@/components/ui/toast";
+import { toast } from "@/components/ui/Toast";
 
 function greeting() {
   const h = new Date().getHours();

@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/DropdownMenu";
 import { Empty } from "@/components/ui/Empty";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
-import { useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/Toast";
 import { useMe } from "@/lib/use-admin";
 import { formatTanggal } from "@/lib/utils";
 import type { User } from "@/lib/types";

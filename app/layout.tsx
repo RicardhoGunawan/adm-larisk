@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   description: "Dashboard",
 };
 
-import { Toaster } from "@/components/ui/toast";
+import { Toaster } from "@/components/ui/Toast";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

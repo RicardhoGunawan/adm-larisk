@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
 import { Empty } from "@/components/ui/Empty";
 import { Stat } from "@/components/Stat";
-import { useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/Toast";
 import { formatRupiah, formatTanggal, statusTagihan } from "@/lib/utils";
 import type { Invoice } from "@/lib/types";
 import { apiFetch } from "@/lib/api";

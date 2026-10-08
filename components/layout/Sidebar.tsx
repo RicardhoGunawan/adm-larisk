@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { NAV } from "@/lib/nav";
 import { useMe } from "@/lib/use-admin";
 import { ConfirmDialog } from "@/components/ui/Dialog";
-import { useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/Toast";
 import { apiFetch, getStoredToken } from "@/lib/api";
 import { hydrateSidebarState, useSidebarCollapsed } from "@/lib/sidebar";
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { PanelLeft } from "lucide-react";
 import { useMe } from "@/lib/use-admin";
 import { ConfirmDialog } from "@/components/ui/Dialog";
-import { useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/Toast";
 import { toggleSidebar, useSidebarCollapsed } from "@/lib/sidebar";
 import { cn } from "@/lib/utils";
 
