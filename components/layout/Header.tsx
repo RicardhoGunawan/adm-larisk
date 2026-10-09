@@ -7,6 +7,7 @@ import { useMe } from "@/lib/use-admin";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
 import { toggleSidebar, useSidebarCollapsed } from "@/lib/sidebar";
+import { clearMeCache } from "@/lib/me";
 import { cn } from "@/lib/utils";
 
 /**
@@ -57,7 +58,7 @@ export function PageHeader({
               className="hidden h-9 items-center gap-2 rounded-full border border-zinc-200 bg-white py-1 pl-1 pr-2.5 hover:bg-zinc-50 sm:flex"
               title={me?.name || "Akun"}
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
                 {initial}
               </span>
               <span className="max-w-[110px] truncate text-[13px] font-semibold text-zinc-800">{me?.name || "Pemilik"}</span>
@@ -82,6 +83,7 @@ export function PageHeader({
         onClose={() => setConfirm(false)}
         onConfirm={() => {
           localStorage.removeItem("larisk_admin_token");
+          clearMeCache();
           toast("Berhasil keluar", "success");
           setTimeout(() => router.push("/login"), 300);
         }}

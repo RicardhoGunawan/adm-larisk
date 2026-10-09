@@ -9,6 +9,7 @@ import { Input, Label, Select } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Dialog, ConfirmDialog } from "@/components/ui/Dialog";
 import { Empty } from "@/components/ui/Empty";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { formatTanggal, statusLangganan } from "@/lib/utils";
@@ -181,19 +182,22 @@ export default function StoresPage() {
                 className="pl-9"
               />
             </div>
-            <div className="flex flex-wrap gap-2">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.value}
-                  onClick={() => { setFilter(f.value); setPage(1); }}
-                  className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
-                    filter === f.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+            <Tabs
+              value={filter}
+              onValueChange={(v) => {
+                setFilter(v as Filter);
+                setPage(1);
+              }}
+              className="w-full sm:w-auto"
+            >
+              <TabsList className="w-full overflow-x-auto sm:w-auto">
+                {FILTERS.map((f) => (
+                  <TabsTrigger key={f.value} value={f.value} className="flex-1 whitespace-nowrap sm:flex-none">
+                    {f.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
             <p className="text-xs text-muted-foreground">{loading ? "Memuat..." : `${total} toko · halaman ${page}/${lastPage}`}</p>
           </CardContent>
         </Card>

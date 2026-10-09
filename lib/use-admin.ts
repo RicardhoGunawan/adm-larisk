@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, getStoredToken } from "@/lib/api";
+import { getMe, type AdminMe } from "@/lib/me";
 
 export function useAdmin<T>(path: string | null) {
   const router = useRouter();
@@ -37,12 +38,19 @@ export function useAdmin<T>(path: string | null) {
 }
 
 export function useMe() {
-  const [me, setMe] = useState<{ id: number; name: string; email: string } | null>(null);
+  const [me, setMe] = useState<AdminMe | null>(null);
   useEffect(() => {
     if (!getStoredToken()) return;
-    apiFetch<{ data: { user: { id: number; name: string; email: string } } }>(`/admin/auth/me`)
-      .then((r) => setMe(r.data.user))
+    let alive = true;
+    // Lewat cache: pindah halaman tidak memicu request baru.
+    getMe()
+      .then((u) => {
+        if (alive) setMe(u);
+      })
       .catch(() => {});
+    return () => {
+      alive = false;
+    };
   }, []);
   return me;
 }

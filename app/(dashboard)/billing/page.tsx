@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
 import { Empty } from "@/components/ui/Empty";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Stat } from "@/components/Stat";
 import { useToast } from "@/components/ui/Toast";
 import { formatRupiah, formatTanggal, statusTagihan } from "@/lib/utils";
@@ -93,19 +94,22 @@ export default function BillingPage() {
                 className="pl-9"
               />
             </div>
-            <div className="flex flex-wrap gap-2">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.value}
-                  onClick={() => { setFilter(f.value); setPage(1); }}
-                  className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold ${
-                    filter === f.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+            <Tabs
+              value={filter}
+              onValueChange={(v) => {
+                setFilter(v as Filter);
+                setPage(1);
+              }}
+              className="w-full sm:w-auto"
+            >
+              <TabsList className="w-full sm:w-auto">
+                {FILTERS.map((f) => (
+                  <TabsTrigger key={f.value} value={f.value} className="flex-1 sm:flex-none">
+                    {f.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           </CardContent>
         </Card>
 

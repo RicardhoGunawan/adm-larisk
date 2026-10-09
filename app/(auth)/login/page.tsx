@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { apiFetch, setStoredToken } from "@/lib/api";
+import { setMeCache } from "@/lib/me";
 import { toast } from "@/components/ui/Toast";
 
 function greeting() {
@@ -38,7 +39,11 @@ export default function LoginPage() {
       const token = (res as unknown as { token?: string })?.token ?? res.data?.token;
       if (!token) throw new Error("Server tidak mengirim token. Coba lagi.");
       setStoredToken(token);
-      const me = await apiFetch<{ data: { user: { name: string } } }>(`/admin/auth/me`);
+      const me = await apiFetch<{ data: { user: { id: number; name: string; email: string } } }>(`/admin/auth/me`);
+      // Simpan ke cache supaya halaman sesudah login tidak fetch /me lagi.
+      setMeCache(me.data.user);
+      // Simpan ke cache supaya halaman sesudah login tidak fetch /me lagi.
+      setMeCache(me.data.user);
       toast.add({
         title: `${greeting()}, ${me.data.user.name}!`,
         description: "Senang melihatmu kembali.",
@@ -59,11 +64,12 @@ export default function LoginPage() {
         aria-hidden
         className="absolute inset-0 bg-[linear-gradient(to_right,#d4d4d8_1px,transparent_1px),linear-gradient(to_bottom,#d4d4d8_1px,transparent_1px)] bg-[size:36px_36px] opacity-40 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_40%,black,transparent)]"
       />
-      <div aria-hidden className="absolute left-1/2 top-0 h-72 w-[640px] max-w-full -translate-x-1/2 rounded-full bg-zinc-900/[0.07] blur-3xl" />
+      <div aria-hidden className="absolute left-1/2 top-0 h-72 w-[640px] max-w-full -translate-x-1/2 rounded-full bg-[#CD1F26]/10 blur-3xl" />
+      <div aria-hidden className="absolute -bottom-24 left-1/2 h-64 w-[520px] max-w-full -translate-x-1/2 rounded-full bg-[#F5B301]/15 blur-3xl" />
 
       <div className="relative w-full max-w-md">
         <div className="mb-8 flex flex-col items-center">
-          <span className="flex h-20 w-20 items-center justify-center rounded-3xl border bg-white shadow-lg shadow-zinc-200">
+          <span className="flex h-20 w-20 items-center justify-center rounded-3xl border border-[#CD1F26]/15 bg-white shadow-lg shadow-red-100">
             <Image
               src="/larisk-logo.png"
               alt="LarisK"
@@ -72,6 +78,11 @@ export default function LoginPage() {
               className="h-[52px] w-[52px] object-contain"
               priority
             />
+          </span>
+          <h1 className="mt-5 text-3xl font-bold tracking-tight">LarisK</h1>
+          <span aria-hidden className="mt-2.5 h-1 w-12 rounded-full bg-[#F5B301]" />
+          <span className="mt-2.5 rounded-full border border-[#CD1F26]/20 bg-white px-3.5 py-1 text-xs font-semibold text-[#B3121B] shadow-sm">
+            Panel Pemilik
           </span>
         </div>
 

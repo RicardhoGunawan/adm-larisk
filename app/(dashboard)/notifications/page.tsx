@@ -72,7 +72,6 @@ export default function NotificationsPage() {
             <Button variant="outline" onClick={load} disabled={loading}>
               <RefreshCw className={loading ? "animate-spin" : ""} /> Muat ulang
             </Button>
-            <Button className="w-full sm:hidden" onClick={() => setModalOpen(true)}><Plus /> Buat pengumuman</Button>
           </CardContent>
         </Card>
 

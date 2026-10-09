@@ -26,7 +26,7 @@ import { useAdmin } from "@/lib/use-admin";
 
 /* ---------- Grafik SVG mungil (tanpa library, tajam di layar besar) ---------- */
 
-function Spark({ points, stroke = "#18181b" }: { points: number[]; stroke?: string }) {
+function Spark({ points, stroke = "#CD1F26" }: { points: number[]; stroke?: string }) {
   const W = 132;
   const H = 40;
   if (points.length < 2) return <div style={{ width: W, height: H }} />;
@@ -46,8 +46,8 @@ function Spark({ points, stroke = "#18181b" }: { points: number[]; stroke?: stri
 
 function RevenueChart({ data }: { data: { label: string; value: number }[] }) {
   const W = 760;
-  const H = 260;
-  const pad = { l: 52, r: 12, t: 16, b: 30 };
+  const H = 190;
+  const pad = { l: 66, r: 12, t: 12, b: 28 };
   const max = Math.max(1, ...data.map((d) => d.value));
   const nice = niceCeil(max);
   const x = (i: number) => pad.l + (i * (W - pad.l - pad.r)) / Math.max(1, data.length - 1);
@@ -74,8 +74,8 @@ function RevenueChart({ data }: { data: { label: string; value: number }[] }) {
     <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Grafik uang masuk 6 bulan">
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#18181b" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="#18181b" stopOpacity="0.02" />
+          <stop offset="0%" stopColor="#CD1F26" stopOpacity="0.25" />
+          <stop offset="100%" stopColor="#CD1F26" stopOpacity="0.03" />
         </linearGradient>
       </defs>
       {[0, 0.33, 0.66, 1].map((f) => {
@@ -91,13 +91,13 @@ function RevenueChart({ data }: { data: { label: string; value: number }[] }) {
         );
       })}
       <path d={area} fill={`url(#${gid})`} />
-      <path d={line} fill="none" stroke="#18181b" strokeWidth={2.5} strokeLinecap="round" />
+      <path d={line} fill="none" stroke="#CD1F26" strokeWidth={2.5} strokeLinecap="round" />
       {pts.map(([cx, cy], i) => (
         <g key={i}>
           <circle cx={cx} cy={cy} r={10} fill="transparent">
             <title>{`${data[i].label}: ${formatRupiah(data[i].value)}`}</title>
           </circle>
-          <circle cx={cx} cy={cy} r={4} fill="#18181b" stroke="#fff" strokeWidth={2} />
+          <circle cx={cx} cy={cy} r={4} fill="#CD1F26" stroke="#fff" strokeWidth={2} />
         </g>
       ))}
       {data.map((d, i) => (
@@ -133,6 +133,7 @@ function Kpi({
   sub,
   delta,
   spark,
+  tone = "default",
 }: {
   icon: LucideIcon;
   label: string;
@@ -140,13 +141,21 @@ function Kpi({
   sub: string;
   delta?: { text: string; up: boolean };
   spark?: number[];
+  tone?: "red" | "gold" | "amber" | "default";
 }) {
+  const tones = {
+    red: { card: "border-[#F3C2C4] bg-[#FCE9EA]", chip: "bg-[#CD1F26] text-white" },
+    gold: { card: "border-[#EED48C] bg-[#FDF3DA]", chip: "bg-[#F5B301] text-[#7A2E00]" },
+    amber: { card: "border-amber-200 bg-amber-50", chip: "bg-amber-500 text-white" },
+    default: { card: "", chip: "bg-primary text-primary-foreground" },
+  } as const;
+  const t = tones[tone];
   return (
-    <Card className="overflow-hidden">
+    <Card className={t.card}>
       <CardContent className="p-5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-zinc-900 text-white">
+            <span className={`flex h-10 w-10 items-center justify-center rounded-[10px] ${t.chip}`}>
               <Icon className="h-5 w-5" />
             </span>
             <p className="text-[13px] font-semibold text-zinc-500">{label}</p>
@@ -163,7 +172,7 @@ function Kpi({
           <p className="text-xs leading-relaxed text-zinc-500">{sub}</p>
           {spark && spark.length > 1 && (
             <div className="hidden shrink-0 sm:block">
-              <Spark points={spark} stroke={delta && !delta.up ? "#b45309" : "#18181b"} />
+              <Spark points={spark} stroke={delta && !delta.up ? "#b45309" : "#CD1F26"} />
             </div>
           )}
         </div>
@@ -263,12 +272,14 @@ export default function DashboardPage() {
                 sub={`Bulan lalu ${formatRupiah(s.revenue_last_month || 0)}`}
                 delta={{ text: `${naik ? "+" : ""}${growth}%`, up: naik }}
                 spark={(s.revenue_6m ?? []).map((r) => r.revenue)}
+                tone="red"
               />
               <Kpi
                 icon={PiggyBank}
                 label="Total uang masuk"
                 value={formatRupiah(s.revenue_total)}
                 sub="Akumulasi sejak awal sampai sekarang"
+                tone="gold"
               />
               <Kpi
                 icon={Store}
@@ -283,12 +294,13 @@ export default function DashboardPage() {
                 value={`${s.pending_invoices.toLocaleString("id-ID")} tagihan`}
                 sub={s.pending_invoices > 0 ? "Segera follow-up agar tidak kedaluwarsa" : "Semua tagihan sudah beres. Bagus!"}
                 delta={s.pending_invoices > 0 ? { text: "Perlu tindakan", up: false } : undefined}
+                tone={s.pending_invoices > 0 ? "amber" : "default"}
               />
             </div>
 
             {/* Grafik arus uang — selebar layar */}
-            <Card>
-              <CardHeader className="flex-row items-start justify-between gap-3 space-y-0 p-5 pb-2 lg:p-6 lg:pb-2">
+            <Card className="overflow-hidden">
+              <CardHeader className="flex-row items-start justify-between gap-3 space-y-0 p-5 pb-3 lg:p-6 lg:pb-3">
                 <div>
                   <CardTitle className="text-base">Arus uang masuk · 6 bulan terakhir</CardTitle>
                   <CardDescription>Dari tagihan langganan yang sudah dibayar toko</CardDescription>
@@ -321,7 +333,7 @@ export default function DashboardPage() {
                   <div className="hidden md:block">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-zinc-50/80">
+                        <TableRow className="bg-[#FBF0D3]/70 hover:bg-[#FBF0D3]/70">
                           <TableHead className="pl-5">No. Tagihan</TableHead>
                           <TableHead>Toko</TableHead>
                           <TableHead className="text-right">Jumlah</TableHead>
@@ -389,7 +401,7 @@ export default function DashboardPage() {
                   {topStores.map((t, i) => (
                     <div key={t.id}>
                       <div className="flex items-center gap-3">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-[13px] font-bold tabular-nums">
+                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[13px] font-bold tabular-nums ${i === 0 ? "bg-[#F5B301] text-[#5C3D00]" : i === 1 ? "bg-zinc-200 text-zinc-700" : i === 2 ? "bg-[#F0C98A] text-[#6B4A00]" : "bg-zinc-100 text-zinc-600"}`}>
                           {i + 1}
                         </span>
                         <div className="min-w-0 flex-1">
@@ -398,7 +410,7 @@ export default function DashboardPage() {
                             <p className="shrink-0 text-[13px] font-bold tabular-nums">{formatRupiah(t.total_sales)}</p>
                           </div>
                           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
-                            <div className="h-full rounded-full bg-zinc-900" style={{ width: `${Math.max(4, (t.total_sales / maxSales) * 100)}%` }} />
+                            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(4, (t.total_sales / maxSales) * 100)}%` }} />
                           </div>
                           <p className="mt-1 text-xs text-zinc-500 tabular-nums">
                             {t.transactions_count.toLocaleString("id-ID")} transaksi · {t.outlets_count} cabang

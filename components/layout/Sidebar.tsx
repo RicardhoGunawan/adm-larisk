@@ -11,6 +11,7 @@ import { useMe } from "@/lib/use-admin";
 import { ConfirmDialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
 import { apiFetch, getStoredToken } from "@/lib/api";
+import { clearMeCache } from "@/lib/me";
 import { hydrateSidebarState, useSidebarCollapsed } from "@/lib/sidebar";
 
 function useLogout() {
@@ -19,6 +20,7 @@ function useLogout() {
   const [confirm, setConfirm] = useState(false);
   const doLogout = () => {
     localStorage.removeItem("larisk_admin_token");
+    clearMeCache();
     toast("Berhasil keluar", "success");
     setTimeout(() => router.push("/login"), 300);
   };
@@ -208,7 +210,7 @@ export function MobileNav() {
           onClick={() => setConfirm(true)}
           aria-label="Keluar"
           title={me?.name || "Keluar"}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-sm font-bold text-white"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground"
         >
           {initial}
         </button>
