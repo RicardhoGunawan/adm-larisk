@@ -267,7 +267,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <Kpi
                 icon={Wallet}
-                label="Uang masuk bulan ini"
+                label="Bulan ini"
                 value={formatRupiah(s.revenue_month)}
                 sub={`Bulan lalu ${formatRupiah(s.revenue_last_month || 0)}`}
                 delta={{ text: `${naik ? "+" : ""}${growth}%`, up: naik }}
