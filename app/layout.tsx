@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LarisK | Dashboard",
-  description: "Dashboard",
+  title: {
+    template: "%s | LarisK",
+    default: "Dashboard | LarisK",
+  },
+  description: "Panel admin LarisK",
 };
 
 import { Toaster } from "@/components/ui/Toast";
