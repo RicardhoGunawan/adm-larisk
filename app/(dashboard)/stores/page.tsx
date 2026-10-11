@@ -198,7 +198,6 @@ export default function StoresPage() {
                 ))}
               </TabsList>
             </Tabs>
-            <p className="text-xs text-muted-foreground">{loading ? "Memuat..." : `${total} toko · halaman ${page}/${lastPage}`}</p>
           </CardContent>
         </Card>
 
